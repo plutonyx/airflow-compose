@@ -1,0 +1,66 @@
+version: "3.2"
+networks:
+  airflow:
+
+services:
+  webserver:
+    env_file:
+      - .env
+    image: apache/airflow:2.0.0-python3.8
+    ports:
+      - 8080:8080
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+    # depends_on:
+    #   - postgres
+    #   - redis
+    command: webserver
+    healthcheck:
+      test: ["CMD-SHELL", "[ -f /opt/airflow/airflow-webserver.pid ]"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+    networks:
+      - airflow
+
+  scheduler:
+    image: apache/airflow:2.0.0-python3.8
+    env_file:
+      - .env
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+    command: scheduler
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+    deploy:
+      mode: replicated
+      replicas: 2
+    networks:
+      - airflow
+
+  initdb:
+    image: apache/airflow:2.0.0-python3.8
+    env_file:
+      - .env
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+    entrypoint: /bin/bash
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 5
+    command: -c "airflow db init && airflow users create --firstname admin --lastname admin --email admin --password admin --username admin --role Admin"
+    # depends_on:
+    #   - redis
+    #   - postgres
+    networks:
+      - airflow
